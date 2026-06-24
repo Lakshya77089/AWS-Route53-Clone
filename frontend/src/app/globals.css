@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --aws-bg: #f2f3f3;
+  --aws-card: #ffffff;
+  --aws-sidebar: #1e2a3a;
+  --aws-sidebar-hover: #2d3a4a;
+  --aws-primary: #ec7211;
+  --aws-primary-hover: #da5e00;
+  --aws-text: #16191f;
+  --aws-text-secondary: #545b64;
+  --aws-border: #d5dbdb;
+  --aws-blue: #146eb4;
+  --aws-blue-hover: #0f5a94;
+  --aws-red: #d13212;
+  --aws-green: #1d8102;
+}
+
+body {
+  background-color: var(--aws-bg);
+  color: var(--aws-text);
+  font-family: "Amazon Ember", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* AWS-style focus ring */
+*:focus-visible {
+  outline: 2px solid var(--aws-primary);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #b0b8c1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8a94a0;
+}
+
+/* Custom table styles */
+.aws-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* AWS-style breadcrumb */
+.aws-breadcrumb a:hover {
+  color: var(--aws-primary);
+}
