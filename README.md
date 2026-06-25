@@ -2,6 +2,12 @@
 
 A functional clone of the AWS Route 53 console: hosted zone and DNS record management with a Next.js frontend, FastAPI backend, and SQLite persistence. Mocked authentication; mocked AWS dependencies (IAM, Organizations, Billing, etc.).
 
+## Live Demo
+
+- **App:** https://awsroute.lakshyasharma.me
+- **API:** https://api.awsroute.lakshyasharma.me/api (Swagger docs at `/docs`)
+- **Login:** `admin` / `admin`
+
 ## Tech Stack
 
 - **Frontend**: Next.js (App Router) + TypeScript + Tailwind CSS
@@ -252,6 +258,51 @@ All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/register` 
 - **Dark mode** — toggle in the top navigation bar; the choice persists across sessions
 - **Keyboard shortcuts** — `/` focuses the search box, `c` starts creating a hosted zone or record (depending on the page)
 - **Bulk operations** — select multiple rows and delete them in one action via the Actions menu
+
+## Deployment
+
+The live demo runs on an **Azure Ubuntu 24.04 VM**, fronted by **Nginx** with **Let's Encrypt** HTTPS. The frontend and backend run as **systemd** services (auto-start on boot, auto-restart on crash), and DNS is managed at **Namecheap**.
+
+```
+                 Internet (HTTPS)
+                       │
+            ┌──────────┴───────────┐
+            ▼                      ▼
+ awsroute.lakshyasharma.me   api.awsroute.lakshyasharma.me
+            │                      │
+            └──────────┬───────────┘
+                       ▼
+                   Nginx (:80/:443, TLS)
+            ┌──────────┴───────────┐
+            ▼                      ▼
+   Next.js (127.0.0.1:3000)   FastAPI/gunicorn (127.0.0.1:8000)
+   systemd: route53-frontend   systemd: route53-backend
+                                       │
+                                       ▼
+                                 SQLite (route53.db)
+```
+
+Only Nginx is exposed publicly (ports 80/443); both app processes bind to localhost. Two A records (`awsroute` and `api.awsroute`) point at the VM's static IP.
+
+### Deploy steps (summary)
+
+1. **VM + network** — Azure VM with a static public IP; open inbound TCP 80/443 in the Network Security Group; `ufw allow OpenSSH` + `ufw allow 'Nginx Full'`.
+2. **DNS (Namecheap → Advanced DNS)** — A records `awsroute` and `api.awsroute` → VM IP.
+3. **Dependencies** — `python3-venv`, `python3-pip`, `nginx`, `git`, Node.js 20.
+4. **Backend** — clone repo; `python3 -m venv venv && pip install -r requirements.txt gunicorn`; create `backend/.env` (set `SECRET_KEY`, `CORS_ORIGINS=https://awsroute.lakshyasharma.me`); `python seed.py`.
+5. **Frontend** — `npm install`; set `frontend/.env.local` → `NEXT_PUBLIC_API_URL=https://api.awsroute.lakshyasharma.me/api`; `npm run build`.
+6. **systemd services** — `route53-backend` runs gunicorn (uvicorn worker) on `127.0.0.1:8000`; `route53-frontend` runs `next start` on `127.0.0.1:3000`; both `enable --now`.
+7. **Nginx** — two server blocks reverse-proxying the app domain → 3000 and the api domain → 8000.
+8. **HTTPS** — `certbot --nginx -d awsroute.lakshyasharma.me -d api.awsroute.lakshyasharma.me` (auto-renews).
+
+### Redeploying after a change
+
+```bash
+cd ~/route53-clone && git pull
+cd backend && source venv/bin/activate && pip install -r requirements.txt && deactivate
+cd ../frontend && npm install && npm run build
+sudo systemctl restart route53-backend route53-frontend
+```
 
 ## Mocked / Out of Scope
 
