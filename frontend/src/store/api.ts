@@ -8,8 +8,13 @@ import {
 
 import type { DNSRecord, HostedZone } from "@/types";
 
+// Backend API base URL. Configurable via NEXT_PUBLIC_API_URL (inlined at build
+// time); falls back to the local dev backend.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:8000/api",
+  baseUrl: API_BASE_URL,
   prepareHeaders: (headers) => {
     const token =
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -204,7 +209,7 @@ export async function exportZone(
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const res = await fetch(
-    `http://localhost:8000/api/hosted-zones/${zoneId}/export?format=${format}`,
+    `${API_BASE_URL}/hosted-zones/${zoneId}/export?format=${format}`,
     { headers: token ? { Authorization: `Bearer ${token}` } : {} },
   );
   if (!res.ok) throw new Error("Export failed");

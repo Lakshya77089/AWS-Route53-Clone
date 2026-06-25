@@ -19,17 +19,21 @@ python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
+cp .env.example .env          # then edit as needed (optional for local dev)
 python seed.py                # creates route53.db with a default user + sample zone
 uvicorn app.main:app --reload --port 8000
 ```
 
 The API runs at `http://localhost:8000` (Swagger docs at `/docs`).
 
-Optional environment variable:
+Configuration is read from `backend/.env` (loaded via `python-dotenv`); see `backend/.env.example`. All values have working defaults, so a local run works without a `.env` file.
 
-| Variable     | Default                               | Purpose                          |
-| ------------ | -------------------------------------- | --------------------------------- |
-| `SECRET_KEY` | dev fallback in `app/dependencies.py` | Secret used to sign JWT tokens. Set this in any real deployment. |
+| Variable        | Default                          | Purpose                                            |
+| --------------- | -------------------------------- | --------------------------------------------------- |
+| `SECRET_KEY`    | dev fallback                     | Secret used to sign JWT tokens. **Set a strong value in production.** |
+| `JWT_ALGORITHM` | `HS256`                          | JWT signing algorithm.                             |
+| `DATABASE_URL`  | `sqlite:///./route53.db`         | SQLAlchemy database URL.                            |
+| `CORS_ORIGINS`  | `http://localhost:3000`          | Comma-separated allowed CORS origins (frontend URL). |
 
 Default seeded credentials: **admin / admin**.
 
@@ -38,10 +42,15 @@ Default seeded credentials: **admin / admin**.
 ```bash
 cd frontend
 npm install
+cp .env.example .env.local    # then edit as needed (optional for local dev)
 npm run dev
 ```
 
-The app runs at `http://localhost:3000` and expects the backend at `http://localhost:8000/api` (see `frontend/src/store/api.ts`).
+The app runs at `http://localhost:3000`. Configuration is read from `frontend/.env.local`; see `frontend/.env.example`.
+
+| Variable               | Default                       | Purpose                  |
+| ---------------------- | ----------------------------- | ------------------------- |
+| `NEXT_PUBLIC_API_URL`  | `http://localhost:8000/api`   | Base URL of the backend API. |
 
 ## Architecture Overview
 

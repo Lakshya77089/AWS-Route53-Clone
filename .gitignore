@@ -8,6 +8,14 @@ backend/app/routers/__pycache__/
 backend/route53.db
 backend/*.db
 
+# Environment files (keep the .example templates tracked)
+.env
+.env.local
+.env.*.local
+backend/.env
+!.env.example
+!**/.env.example
+
 # Node / frontend (frontend/.gitignore also covers most of this)
 frontend/node_modules/
 frontend/.next/

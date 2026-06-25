@@ -1,18 +1,12 @@
-import os
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from .config import ALGORITHM, SECRET_KEY
 from .database import get_db
 from .models import User
-
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "route53-clone-dev-secret-key-do-not-use-in-production"
-)
-ALGORITHM = "HS256"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 auth_scheme = HTTPBearer(auto_error=False)

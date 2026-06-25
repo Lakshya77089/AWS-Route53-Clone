@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .config import CORS_ORIGINS
 from .database import Base, engine
 from .routers import auth, dns_records, hosted_zones, import_export
 
@@ -10,7 +11,7 @@ app = FastAPI(title="Route53 Clone API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
