@@ -5,6 +5,7 @@ A functional clone of the AWS Route 53 console: hosted zone and DNS record manag
 ## Tech Stack
 
 - **Frontend**: Next.js (App Router) + TypeScript + Tailwind CSS
+- **State management**: Redux Toolkit + RTK Query
 - **Backend**: FastAPI + SQLAlchemy
 - **Database**: SQLite
 
@@ -40,16 +41,47 @@ npm install
 npm run dev
 ```
 
-The app runs at `http://localhost:3000` and expects the backend at `http://localhost:8000/api` (see `frontend/src/lib/api.ts`).
+The app runs at `http://localhost:3000` and expects the backend at `http://localhost:8000/api` (see `frontend/src/store/api.ts`).
 
 ## Architecture Overview
+
+### System diagram
+
+```mermaid
+flowchart LR
+    subgraph Browser["Browser — Next.js (App Router)"]
+        UI["Pages & Components<br/>(hosted zones, records, dashboard)"]
+        Store["Redux Toolkit store<br/>auth slice · theme slice"]
+        RTKQ["RTK Query API<br/>cache · auto-invalidation"]
+        UI --> Store
+        UI --> RTKQ
+    end
+
+    subgraph Server["FastAPI backend"]
+        Routers["Routers<br/>auth · hosted_zones · dns_records · import_export"]
+        Deps["Auth dependency<br/>JWT verify · bcrypt"]
+        Valid["Validators<br/>type-specific record rules"]
+        Routers --> Deps
+        Routers --> Valid
+    end
+
+    DB[("SQLite<br/>route53.db")]
+
+    RTKQ -- "REST /api  (Bearer JWT)" --> Routers
+    Routers -- "SQLAlchemy ORM" --> DB
+```
+
+### Folder layout
 
 ```
 frontend/        Next.js app (App Router, client components)
   src/app/         routes: /login, /, /hosted-zones, /hosted-zones/[id],
+                    /hosted-zones/create, /hosted-zones/[id]/records/create,
+                    /hosted-zones/[id]/records/[recordId]/edit,
                     /traffic-policies, /health-checks, /resolver, /profiles
-  src/components/  Sidebar, Modal, RecordForm, ComingSoon, Toast
-  src/lib/         axios client (api.ts), auth context, toast context
+  src/store/       Redux store, slices (auth, theme), RTK Query API, typed hooks
+  src/components/  TopNav, Sidebar, Modal, RecordForm, ComingSoon
+  src/lib/         auth + theme wrappers (Redux-backed), toast context, shortcuts
   src/types/       shared TS types (HostedZone, DNSRecord, RecordType)
 
 backend/         FastAPI app
@@ -58,12 +90,63 @@ backend/         FastAPI app
   app/models.py     ORM models: User, HostedZone, DNSRecord
   app/schemas.py    Pydantic request/response models
   app/dependencies.py  password hashing, JWT issuing/verification
-  app/routers/      auth, hosted_zones, dns_records endpoints
+  app/validators.py    type-specific DNS record validation
+  app/bind.py          BIND zone-file export/parse
+  app/routers/      auth, hosted_zones, dns_records, import_export endpoints
 ```
 
-The frontend talks to the backend exclusively over REST under `/api`. Auth is JWT-based: `POST /api/auth/login` returns a bearer token, which the frontend stores in `localStorage` and sends as `Authorization: Bearer <token>` on every subsequent request. On load, the app calls `GET /api/auth/me` with the stored token to restore the session; an invalid/expired token triggers a redirect to `/login`. All Hosted Zone and DNS Record data is scoped to the authenticated user and persisted in SQLite (`backend/route53.db`).
+The frontend talks to the backend exclusively over REST under `/api`. **State lives in a Redux Toolkit store**: `auth` and `theme` slices hold global UI state, while **RTK Query** owns all server data (hosted zones, records) with automatic caching and tag-based invalidation — a create/update/delete refreshes the affected lists without manual refetching.
+
+Auth is JWT-based: `POST /api/auth/login` returns a bearer token, which the frontend stores in `localStorage` and the RTK Query base query attaches as `Authorization: Bearer <token>` on every request. On load, the app calls `GET /api/auth/me` with the stored token to restore the session; an invalid/expired (401) response clears the token and redirects to `/login`. All Hosted Zone and DNS Record data is scoped to the authenticated user and persisted in SQLite (`backend/route53.db`).
 
 ## Database Schema
+
+### Entity-relationship diagram
+
+```mermaid
+erDiagram
+    USERS ||--o{ HOSTED_ZONES : owns
+    HOSTED_ZONES ||--o{ DNS_RECORDS : contains
+
+    USERS {
+        int id PK
+        string username UK
+        string password_hash
+        bool is_active
+        datetime created_at
+    }
+
+    HOSTED_ZONES {
+        string id PK "UUID"
+        string name
+        string description
+        bool private_zone
+        int record_count
+        int user_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    DNS_RECORDS {
+        string id PK "UUID"
+        string zone_id FK
+        string name
+        string type "A|AAAA|CNAME|TXT|MX|NS|PTR|SRV|CAA"
+        text value
+        int ttl
+        int priority "MX/SRV"
+        int weight "SRV"
+        int port "SRV"
+        int flags "CAA"
+        string tag "CAA"
+        datetime created_at
+        datetime updated_at
+    }
+```
+
+A user has many hosted zones; a hosted zone has many DNS records. Deleting a zone cascades to its records.
+
+### Column reference
 
 **users**
 | Column         | Type      | Notes                  |
@@ -102,8 +185,6 @@ The frontend talks to the backend exclusively over REST under `/api`. Auth is JW
 | tag        | String     | CAA (`issue` / `issuewild` / `iodef`)             |
 | created_at | DateTime   |                                                    |
 | updated_at | DateTime   |                                                    |
-
-A user has many hosted zones; a hosted zone has many DNS records (deleting a zone cascades to its records).
 
 ## API Overview
 
@@ -149,6 +230,7 @@ All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/register` 
 ## Features
 
 - Mocked authentication (login, logout, session persistence via JWT + `localStorage`)
+- Centralized state management with Redux Toolkit + RTK Query (cached server data, automatic cache invalidation on mutations)
 - Full CRUD for Hosted Zones with search and pagination
 - Full CRUD for DNS Records (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA) with search, type filtering, and pagination
 - Route53-styled navigation, tables, forms, modals, and toast notifications
