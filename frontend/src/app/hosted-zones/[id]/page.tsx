@@ -19,6 +19,8 @@ import {
   Filter,
   Lock,
   Unlock,
+  Download,
+  Upload,
 } from "lucide-react";
 import Modal from "@/components/Modal";
 
@@ -54,8 +56,10 @@ export default function ZoneDetailPage() {
   const pageSize = 20;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [showDelete, setShowDelete] = useState<DNSRecord[] | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -110,6 +114,64 @@ export default function ZoneDetailPage() {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       toast.error(e.response?.data?.detail || "Failed to delete record");
+    }
+  };
+
+  const handleExport = async (format: "json" | "bind") => {
+    setExportOpen(false);
+    try {
+      const res = await api.get(`/hosted-zones/${zoneId}/export`, {
+        headers: authHeaders(),
+        params: { format },
+        responseType: format === "json" ? "json" : "text",
+      });
+      const data =
+        format === "json"
+          ? JSON.stringify(res.data, null, 2)
+          : (res.data as string);
+      const mime = format === "json" ? "application/json" : "text/plain";
+      const blob = new Blob([data], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const base = zone?.name.replace(/\.$/, "") || "zone";
+      a.href = url;
+      a.download = format === "json" ? `${base}.json` : `${base}.zone`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported zone as ${format.toUpperCase()}`);
+    } catch {
+      toast.error("Failed to export zone");
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-importing the same file
+    if (!file) return;
+    try {
+      const content = await file.text();
+      const res = await api.post(
+        `/hosted-zones/${zoneId}/import`,
+        { content },
+        { headers: authHeaders() },
+      );
+      const { imported, skipped } = res.data as {
+        imported: number;
+        skipped: number;
+      };
+      await fetchData();
+      setSelected(new Set());
+      if (imported > 0) {
+        toast.success(
+          `Imported ${imported} record${imported !== 1 ? "s" : ""}` +
+            (skipped > 0 ? ` (${skipped} skipped)` : ""),
+        );
+      } else {
+        toast.error("No records imported — check the file format");
+      }
+    } catch (err: unknown) {
+      const ex = err as { response?: { data?: { detail?: string } } };
+      toast.error(ex.response?.data?.detail || "Failed to import zone file");
     }
   };
 
@@ -228,6 +290,57 @@ export default function ZoneDetailPage() {
               </>
             )}
           </div>
+
+          {/* Export dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen((v) => !v)}
+              className="btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            {exportOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 w-44 rounded shadow-lg border z-20 py-1"
+                  style={{ backgroundColor: "#fff", borderColor: "var(--aws-border)" }}
+                >
+                  <button
+                    onClick={() => handleExport("json")}
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50"
+                  >
+                    Export as JSON
+                  </button>
+                  <button
+                    onClick={() => handleExport("bind")}
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50"
+                  >
+                    Export as BIND
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Import */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Import
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zone,.txt,.bind,text/plain"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+
           <button
             onClick={() => router.push(`/hosted-zones/${zoneId}/records/create`)}
             className="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
