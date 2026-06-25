@@ -10,6 +10,7 @@ from ..schemas import (
     DNSRecordUpdate,
     PaginatedDNSRecords,
 )
+from ..validators import validate_record
 
 router = APIRouter(prefix="/api/hosted-zones/{zone_id}/records", tags=["dns-records"])
 
@@ -99,10 +100,21 @@ def create_record(
 ):
     zone = _get_zone_or_404(zone_id, current_user.id, db)
 
+    record_type = body.type.upper()
+    validate_record(
+        record_type,
+        body.value,
+        priority=body.priority,
+        weight=body.weight,
+        port=body.port,
+        flags=body.flags,
+        tag=body.tag,
+    )
+
     record = DNSRecord(
         zone_id=zone_id,
         name=body.name,
-        type=body.type.upper(),
+        type=record_type,
         value=body.value,
         ttl=body.ttl,
         priority=body.priority,
@@ -145,6 +157,18 @@ def update_record(
         record.flags = body.flags
     if body.tag is not None:
         record.tag = body.tag
+
+    # Validate the merged result so a partial update can't leave the record
+    # in an invalid state for its type.
+    validate_record(
+        record.type,
+        record.value,
+        priority=record.priority,
+        weight=record.weight,
+        port=record.port,
+        flags=record.flags,
+        tag=record.tag,
+    )
 
     db.commit()
     db.refresh(record)
