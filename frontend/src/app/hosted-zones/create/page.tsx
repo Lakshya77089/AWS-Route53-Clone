@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import api, { authHeaders } from "@/lib/api";
+import { useCreateZoneMutation, apiErrorMessage } from "@/store/api";
 import { ChevronRight } from "lucide-react";
 
 export default function CreateHostedZonePage() {
@@ -15,30 +15,26 @@ export default function CreateHostedZonePage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [privateZone, setPrivateZone] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [createZone, { isLoading: saving }] = useCreateZoneMutation();
 
   if (authLoading || !user) return null;
 
   const handleCreate = async () => {
     if (!name) return;
-    setSaving(true);
     setError("");
     try {
-      await api.post(
-        "/hosted-zones",
-        { name, description, private_zone: privateZone },
-        { headers: authHeaders() },
-      );
+      await createZone({
+        name,
+        description,
+        private_zone: privateZone,
+      }).unwrap();
       toast.success(`Hosted zone "${name}" created`);
       router.push("/hosted-zones");
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      const message = e.response?.data?.detail || "Failed to create hosted zone";
+      const message = apiErrorMessage(err, "Failed to create hosted zone");
       setError(message);
       toast.error(message);
-    } finally {
-      setSaving(false);
     }
   };
 

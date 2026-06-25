@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { useShortcuts } from "@/lib/use-shortcuts";
-import api, { authHeaders } from "@/lib/api";
+import {
+  useListZonesQuery,
+  useUpdateZoneMutation,
+  useDeleteZoneMutation,
+  apiErrorMessage,
+} from "@/store/api";
 import type { HostedZone } from "@/types";
 import {
   Plus,
@@ -24,9 +29,6 @@ export default function HostedZonesPage() {
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const router = useRouter();
-  const [zones, setZones] = useState<HostedZone[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;
@@ -35,10 +37,18 @@ export default function HostedZonesPage() {
   const [showEdit, setShowEdit] = useState<HostedZone | null>(null);
   const [showDelete, setShowDelete] = useState<HostedZone[] | null>(null);
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const actionsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const { data, isLoading: loading } = useListZonesQuery(
+    { search, page, page_size: pageSize },
+    { skip: !user },
+  );
+  const zones = data?.zones ?? [];
+  const total = data?.total ?? 0;
+  const [updateZone, { isLoading: saving }] = useUpdateZoneMutation();
+  const [deleteZone] = useDeleteZoneMutation();
 
   useShortcuts([
     { key: "/", handler: () => searchRef.current?.focus() },
@@ -49,47 +59,17 @@ export default function HostedZonesPage() {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
 
-  const fetchZones = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/hosted-zones", {
-        headers: authHeaders(),
-        params: { search, page, page_size: pageSize },
-      });
-      setZones(res.data.zones);
-      setTotal(res.data.total);
-    } catch {
-      // handled by interceptor
-    } finally {
-      setLoading(false);
-    }
-  }, [search, page]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (user) fetchZones();
-  }, [user, fetchZones]);
-
   const handleEdit = async () => {
     if (!showEdit) return;
-    setSaving(true);
     setError("");
     try {
-      await api.put(
-        `/hosted-zones/${showEdit.id}`,
-        { description },
-        { headers: authHeaders() },
-      );
+      await updateZone({ id: showEdit.id, description }).unwrap();
       setShowEdit(null);
-      await fetchZones();
       toast.success(`Hosted zone "${showEdit.name}" updated`);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      const message = e.response?.data?.detail || "Failed to update hosted zone";
+      const message = apiErrorMessage(err, "Failed to update hosted zone");
       setError(message);
       toast.error(message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -97,22 +77,16 @@ export default function HostedZonesPage() {
     if (!showDelete) return;
     const targets = showDelete;
     try {
-      await Promise.all(
-        targets.map((z) =>
-          api.delete(`/hosted-zones/${z.id}`, { headers: authHeaders() }),
-        ),
-      );
+      await Promise.all(targets.map((z) => deleteZone(z.id).unwrap()));
       setShowDelete(null);
       setSelected(new Set());
-      await fetchZones();
       toast.success(
         targets.length === 1
           ? `Hosted zone "${targets[0].name}" deleted`
           : `${targets.length} hosted zones deleted`,
       );
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      toast.error(e.response?.data?.detail || "Failed to delete hosted zone");
+      toast.error(apiErrorMessage(err, "Failed to delete hosted zone"));
     }
   };
 

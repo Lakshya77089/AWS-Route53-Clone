@@ -1,68 +1,56 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
-import api, { authHeaders } from "./api";
+import { useCallback, useEffect, type ReactNode } from "react";
 
-interface User {
-  id: number;
-  username: string;
-}
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { setUser, setAuthLoading, clearAuth } from "@/store/auth-slice";
+import { api } from "@/store/api";
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType>(null!);
-
+/**
+ * Restores the session on mount (this used to be the AuthProvider). State now
+ * lives in the Redux `auth` slice; this component only runs the side effects.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) {
-      api
-        .get("/auth/me", { headers: authHeaders() })
-        .then((res) =>
-          setUser({ id: res.data.id, username: res.data.username }),
-        )
-        .catch(() => localStorage.removeItem("token"))
-        .finally(() => setLoading(false));
-    } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
+    if (!token) {
+      dispatch(setAuthLoading(false));
+      return;
     }
-  }, []);
+    dispatch(api.endpoints.me.initiate(undefined))
+      .unwrap()
+      .then((data) => dispatch(setUser({ id: data.id, username: data.username })))
+      .catch(() => localStorage.removeItem("token"))
+      .finally(() => dispatch(setAuthLoading(false)));
+  }, [dispatch]);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const res = await api.post("/auth/login", { username, password });
-    // Backend returns { user: { id, username, ... }, token: "..." }
-    localStorage.setItem("token", res.data.token);
-    setUser({ id: res.data.user.id, username: res.data.user.username });
-  }, []);
+  return <>{children}</>;
+}
+
+/** Drop-in replacement for the old context hook, backed by Redux. */
+export function useAuth() {
+  const dispatch = useAppDispatch();
+  const { user, loading } = useAppSelector((s) => s.auth);
+
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const res = await dispatch(
+        api.endpoints.login.initiate({ username, password }),
+      ).unwrap();
+      localStorage.setItem("token", res.token);
+      dispatch(setUser({ id: res.user.id, username: res.user.username }));
+    },
+    [dispatch],
+  );
 
   const logout = useCallback(() => {
     localStorage.removeItem("token");
-    setUser(null);
-  }, []);
+    dispatch(clearAuth());
+    // Drop any cached authorized data so the next user starts clean.
+    dispatch(api.util.resetApiState());
+  }, [dispatch]);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
+  return { user, loading, login, logout };
 }

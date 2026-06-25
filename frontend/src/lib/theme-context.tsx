@@ -1,54 +1,29 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 
-type Theme = "light" | "dark";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { toggleTheme } from "@/store/theme-slice";
 
-interface ThemeContextType {
-  theme: Theme;
-  toggle: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextType>(null!);
-
-// The inline script in the root layout sets data-theme before paint, so we can
-// read the resolved value from the DOM for the initial state (no SSR mismatch).
-function initialTheme(): Theme {
-  if (typeof document !== "undefined") {
-    const attr = document.documentElement.getAttribute("data-theme");
-    if (attr === "dark" || attr === "light") return attr;
-  }
-  return "light";
-}
-
+/**
+ * Syncs the Redux theme value to the <html> data-theme attribute and
+ * localStorage. State itself lives in the `theme` slice.
+ */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const theme = useAppSelector((s) => s.theme.theme);
 
-  // Reflect the current theme on <html> so the CSS token overrides apply.
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggle = useCallback(
-    () => setTheme((t) => (t === "light" ? "dark" : "light")),
-    [],
-  );
-
-  return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <>{children}</>;
 }
 
+/** Drop-in replacement for the old context hook, backed by Redux. */
 export function useTheme() {
-  return useContext(ThemeContext);
+  const dispatch = useAppDispatch();
+  const theme = useAppSelector((s) => s.theme.theme);
+  const toggle = useCallback(() => dispatch(toggleTheme()), [dispatch]);
+  return { theme, toggle };
 }

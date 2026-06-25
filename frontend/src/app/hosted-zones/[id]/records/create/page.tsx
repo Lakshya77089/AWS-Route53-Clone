@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import api, { authHeaders } from "@/lib/api";
+import { useCreateRecordMutation, apiErrorMessage } from "@/store/api";
 import type { DNSRecord, RecordType } from "@/types";
 import { ChevronRight } from "lucide-react";
 import RecordForm from "@/components/RecordForm";
@@ -21,28 +21,22 @@ export default function CreateRecordPage() {
     value: "",
     ttl: 300,
   });
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [createRecord, { isLoading: saving }] = useCreateRecordMutation();
 
   if (authLoading || !user) return null;
 
   const handleCreate = async () => {
     if (!form.name || !form.value || !form.type) return;
-    setSaving(true);
     setError("");
     try {
-      await api.post(`/hosted-zones/${id}/records`, form, {
-        headers: authHeaders(),
-      });
+      await createRecord({ zoneId: id, body: form }).unwrap();
       toast.success(`${form.type} record "${form.name}" created`);
       router.push(`/hosted-zones/${id}`);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      const message = e.response?.data?.detail || "Failed to create record";
+      const message = apiErrorMessage(err, "Failed to create record");
       setError(message);
       toast.error(message);
-    } finally {
-      setSaving(false);
     }
   };
 

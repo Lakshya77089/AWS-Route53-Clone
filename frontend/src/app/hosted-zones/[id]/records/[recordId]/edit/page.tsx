@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import api, { authHeaders } from "@/lib/api";
+import {
+  useGetRecordQuery,
+  useUpdateRecordMutation,
+  apiErrorMessage,
+} from "@/store/api";
 import type { DNSRecord } from "@/types";
 import { ChevronRight, RotateCw } from "lucide-react";
 import RecordForm from "@/components/RecordForm";
@@ -16,38 +20,39 @@ export default function EditRecordPage() {
   const toast = useToast();
   const router = useRouter();
   const [form, setForm] = useState<Partial<DNSRecord> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [seededId, setSeededId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!user) return;
-    api
-      .get(`/hosted-zones/${id}/records/${recordId}`, { headers: authHeaders() })
-      .then((res) => setForm(res.data))
-      .catch(() => setError("Record not found"))
-      .finally(() => setLoading(false));
-  }, [user, id, recordId]);
+  const {
+    data: record,
+    isLoading: loading,
+    isError,
+  } = useGetRecordQuery(
+    { zoneId: id, recordId },
+    { skip: !user },
+  );
+  const [updateRecord, { isLoading: saving }] = useUpdateRecordMutation();
+
+  // Seed the editable form when a new record loads. Adjusting state during
+  // render (the React-recommended pattern) instead of using an effect.
+  if (record && seededId !== record.id) {
+    setForm(record);
+    setSeededId(record.id);
+  }
 
   if (authLoading || !user) return null;
 
   const handleSave = async () => {
     if (!form || !form.name || !form.value) return;
-    setSaving(true);
     setError("");
     try {
-      await api.put(`/hosted-zones/${id}/records/${recordId}`, form, {
-        headers: authHeaders(),
-      });
+      await updateRecord({ zoneId: id, recordId, body: form }).unwrap();
       toast.success(`${form.type} record "${form.name}" updated`);
       router.push(`/hosted-zones/${id}`);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      const message = e.response?.data?.detail || "Failed to update record";
+      const message = apiErrorMessage(err, "Failed to update record");
       setError(message);
       toast.error(message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -75,7 +80,7 @@ export default function EditRecordPage() {
         <div className="flex items-center justify-center py-12">
           <RotateCw className="w-5 h-5 animate-spin" style={{ color: "var(--aws-blue)" }} />
         </div>
-      ) : !form ? (
+      ) : isError || !form ? (
         <p className="text-sm" style={{ color: "var(--aws-red)" }}>
           Record not found.
         </p>

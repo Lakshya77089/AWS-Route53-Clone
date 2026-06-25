@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ReduxProvider from "@/store/provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/lib/toast-context";
 import { ThemeProvider } from "@/lib/theme-context";
@@ -25,19 +26,21 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="h-full flex flex-col overflow-hidden">
-        <ThemeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <TopNav />
-              <div className="flex flex-1 overflow-hidden">
-                <Sidebar />
-                <main className="flex-1 overflow-y-auto bg-[var(--aws-bg)]">
-                  {children}
-                </main>
-              </div>
-            </ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <ReduxProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <TopNav />
+                <div className="flex flex-1 overflow-hidden">
+                  <Sidebar />
+                  <main className="flex-1 overflow-y-auto bg-[var(--aws-bg)]">
+                    {children}
+                  </main>
+                </div>
+              </ToastProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ReduxProvider>
       </body>
     </html>
   );

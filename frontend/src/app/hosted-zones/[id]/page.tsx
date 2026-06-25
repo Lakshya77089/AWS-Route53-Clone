@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { useShortcuts } from "@/lib/use-shortcuts";
-import api, { authHeaders } from "@/lib/api";
-import type { HostedZone, DNSRecord } from "@/types";
+import {
+  useGetZoneQuery,
+  useListRecordsQuery,
+  useDeleteRecordMutation,
+  useImportZoneMutation,
+  exportZone,
+  apiErrorMessage,
+} from "@/store/api";
+import type { DNSRecord } from "@/types";
 import { RECORD_TYPES } from "@/types";
 import {
   Plus,
@@ -47,10 +54,6 @@ export default function ZoneDetailPage() {
   const router = useRouter();
   const zoneId = id; // UUID string, not integer
 
-  const [zone, setZone] = useState<HostedZone | null>(null);
-  const [records, setRecords] = useState<DNSRecord[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [page, setPage] = useState(1);
@@ -63,6 +66,17 @@ export default function ZoneDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const { data: zone } = useGetZoneQuery(zoneId, { skip: !user });
+  const { data: recordsData, isLoading: recordsLoading } = useListRecordsQuery(
+    { zoneId, search, type: typeFilter, page, page_size: pageSize },
+    { skip: !user },
+  );
+  const records = recordsData?.records ?? [];
+  const total = recordsData?.total ?? 0;
+  const loading = recordsLoading || !zone;
+  const [deleteRecord] = useDeleteRecordMutation();
+  const [importZone] = useImportZoneMutation();
+
   useShortcuts([
     { key: "/", handler: () => searchRef.current?.focus() },
     { key: "c", handler: () => router.push(`/hosted-zones/${zoneId}/records/create`) },
@@ -72,31 +86,6 @@ export default function ZoneDetailPage() {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [zoneRes, recordsRes] = await Promise.all([
-        api.get(`/hosted-zones/${zoneId}`, { headers: authHeaders() }),
-        api.get(`/hosted-zones/${zoneId}/records`, {
-          headers: authHeaders(),
-          params: { search, type: typeFilter, page, page_size: pageSize },
-        }),
-      ]);
-      setZone(zoneRes.data);
-      setRecords(recordsRes.data.records);
-      setTotal(recordsRes.data.total);
-    } catch {
-      // handled by interceptor
-    } finally {
-      setLoading(false);
-    }
-  }, [zoneId, search, typeFilter, page]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (user) fetchData();
-  }, [user, fetchData]);
-
   if (authLoading || !user) return null;
 
   const handleDelete = async () => {
@@ -105,37 +94,27 @@ export default function ZoneDetailPage() {
     try {
       await Promise.all(
         targets.map((r) =>
-          api.delete(`/hosted-zones/${zoneId}/records/${r.id}`, {
-            headers: authHeaders(),
-          }),
+          deleteRecord({ zoneId, recordId: r.id }).unwrap(),
         ),
       );
       setShowDelete(null);
       setSelected(new Set());
-      await fetchData();
       toast.success(
         targets.length === 1
           ? `${targets[0].type} record "${targets[0].name}" deleted`
           : `${targets.length} records deleted`,
       );
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      toast.error(e.response?.data?.detail || "Failed to delete record");
+      toast.error(apiErrorMessage(err, "Failed to delete record"));
     }
   };
 
   const handleExport = async (format: "json" | "bind") => {
     setExportOpen(false);
     try {
-      const res = await api.get(`/hosted-zones/${zoneId}/export`, {
-        headers: authHeaders(),
-        params: { format },
-        responseType: format === "json" ? "json" : "text",
-      });
+      const raw = await exportZone(zoneId, format);
       const data =
-        format === "json"
-          ? JSON.stringify(res.data, null, 2)
-          : (res.data as string);
+        format === "json" ? JSON.stringify(JSON.parse(raw), null, 2) : raw;
       const mime = format === "json" ? "application/json" : "text/plain";
       const blob = new Blob([data], { type: mime });
       const url = URL.createObjectURL(blob);
@@ -157,16 +136,10 @@ export default function ZoneDetailPage() {
     if (!file) return;
     try {
       const content = await file.text();
-      const res = await api.post(
-        `/hosted-zones/${zoneId}/import`,
-        { content },
-        { headers: authHeaders() },
-      );
-      const { imported, skipped } = res.data as {
-        imported: number;
-        skipped: number;
-      };
-      await fetchData();
+      const { imported, skipped } = await importZone({
+        zoneId,
+        content,
+      }).unwrap();
       setSelected(new Set());
       if (imported > 0) {
         toast.success(
@@ -177,8 +150,7 @@ export default function ZoneDetailPage() {
         toast.error("No records imported — check the file format");
       }
     } catch (err: unknown) {
-      const ex = err as { response?: { data?: { detail?: string } } };
-      toast.error(ex.response?.data?.detail || "Failed to import zone file");
+      toast.error(apiErrorMessage(err, "Failed to import zone file"));
     }
   };
 
