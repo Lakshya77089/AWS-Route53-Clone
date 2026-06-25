@@ -135,6 +135,12 @@ All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/register` 
 | PUT    | `/{record_id}`   | Update a record                                                  |
 | DELETE | `/{record_id}`   | Delete a record                                                  |
 
+**Import / Export** (`/api/hosted-zones/{zone_id}`)
+| Method | Path        | Description                                                |
+| ------ | ----------- | ----------------------------------------------------------- |
+| GET    | `/export`   | Export the zone as `?format=json` or `?format=bind` (file) |
+| POST   | `/import`   | Import records from a BIND zone file (`{ "content": ... }`) |
+
 **Health**
 | Method | Path          | Description     |
 | ------ | ------------- | ---------------- |
@@ -146,7 +152,15 @@ All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/register` 
 - Full CRUD for Hosted Zones with search and pagination
 - Full CRUD for DNS Records (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA) with search, type filtering, and pagination
 - Route53-styled navigation, tables, forms, modals, and toast notifications
+- Type-specific record validation (IPv4 for A, IPv6 for AAAA, hostnames for CNAME/NS/PTR/MX/SRV, required priority/weight/port/flags/tag where applicable)
 - "Coming Soon" placeholder pages for Dashboard-adjacent sections not in scope: Traffic Policies, Health Checks, Resolver, Profiles
+
+## Bonus Features
+
+- **Import / Export** — export a hosted zone as JSON or a BIND zone file, and import records from a BIND zone file (invalid records are skipped and reported)
+- **Dark mode** — toggle in the top navigation bar; the choice persists across sessions
+- **Keyboard shortcuts** — `/` focuses the search box, `c` starts creating a hosted zone or record (depending on the page)
+- **Bulk operations** — select multiple rows and delete them in one action via the Actions menu
 
 ## Mocked / Out of Scope
 
