@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, Bell, HelpCircle, Settings, ChevronDown } from "lucide-react";
+import { Search, Bell, HelpCircle, Settings, ChevronDown, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 
 export default function TopNav() {
   const { user, logout } = useAuth();
+  const { theme, toggle } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [accountOpen, setAccountOpen] = useState(false);
@@ -64,6 +66,13 @@ export default function TopNav() {
           Global
           <ChevronDown className="w-3 h-3" />
         </button>
+        <button
+          onClick={toggle}
+          className="p-1.5 rounded hover:bg-white/10 transition-colors"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
         <button className="p-1.5 rounded hover:bg-white/10 transition-colors" title="Notifications">
           <Bell className="w-4 h-4" />
         </button>
@@ -89,7 +98,7 @@ export default function TopNav() {
               <div className="fixed inset-0" onClick={() => setAccountOpen(false)} />
               <div
                 className="absolute right-0 top-full mt-1 w-44 rounded shadow-lg border z-40 py-1"
-                style={{ backgroundColor: "#ffffff", borderColor: "var(--aws-border)" }}
+                style={{ backgroundColor: "var(--aws-surface)", borderColor: "var(--aws-border)" }}
               >
                 <div className="px-3 py-2 text-xs border-b" style={{ borderColor: "var(--aws-border-divider)", color: "var(--aws-text-secondary)" }}>
                   Signed in as

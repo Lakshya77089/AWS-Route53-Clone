@@ -40,6 +40,45 @@
   --aws-green-bg: #f2fcf3;
   --aws-orange-bg: #fff7e6;
   --aws-blue-bg: #f0f7ff;
+
+  /* Generic surface used by popovers/modals (overridden in dark mode) */
+  --aws-surface: #ffffff;
+}
+
+[data-theme="dark"] {
+  /* Service navigation */
+  --aws-sidebar: #1b232d;
+  --aws-sidebar-hover: #232f3b;
+  --aws-sidebar-active: #18344e;
+  --aws-sidebar-border: #2a333d;
+
+  /* Surfaces */
+  --aws-bg: #0f1b2a;
+  --aws-card: #1b232d;
+  --aws-table-header: #232b35;
+  --aws-surface: #1b232d;
+
+  /* Brand / accents stay vivid on dark */
+  --aws-blue: #539fe5;
+  --aws-blue-hover: #89bdee;
+  --aws-link: #539fe5;
+
+  /* Text */
+  --aws-text: #e9ebed;
+  --aws-text-secondary: #a4b0bd;
+  --aws-text-disabled: #6b7785;
+
+  /* Borders */
+  --aws-border: #3a4552;
+  --aws-border-divider: #2a333d;
+
+  /* Status (slightly muted backgrounds for dark) */
+  --aws-red: #eb6f6f;
+  --aws-red-bg: #2d1f1f;
+  --aws-green: #4caf83;
+  --aws-green-bg: #16291f;
+  --aws-orange-bg: #2e2616;
+  --aws-blue-bg: #16293d;
 }
 
 body {
@@ -107,7 +146,7 @@ body {
 
 /* Cloudscape-style normal/secondary button */
 .btn-secondary {
-  background-color: #ffffff;
+  background-color: var(--aws-surface);
   color: var(--aws-blue);
   border: 1px solid var(--aws-blue);
 }
@@ -115,7 +154,7 @@ body {
   background-color: var(--aws-blue-bg);
 }
 .btn-secondary:disabled {
-  border-color: #d5dbdb;
-  color: #9ba7b6;
-  background-color: #ffffff;
+  border-color: var(--aws-border);
+  color: var(--aws-text-disabled);
+  background-color: var(--aws-surface);
 }

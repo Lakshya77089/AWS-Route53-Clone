@@ -262,7 +262,7 @@ export default function ZoneDetailPage() {
                 <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
                 <div
                   className="absolute right-0 top-full mt-1 w-44 rounded shadow-lg border z-20 py-1"
-                  style={{ backgroundColor: "#fff", borderColor: "var(--aws-border)" }}
+                  style={{ backgroundColor: "var(--aws-surface)", borderColor: "var(--aws-border)" }}
                 >
                   <button
                     disabled={selectedRecords.length !== 1}
@@ -306,7 +306,7 @@ export default function ZoneDetailPage() {
                 <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
                 <div
                   className="absolute right-0 top-full mt-1 w-44 rounded shadow-lg border z-20 py-1"
-                  style={{ backgroundColor: "#fff", borderColor: "var(--aws-border)" }}
+                  style={{ backgroundColor: "var(--aws-surface)", borderColor: "var(--aws-border)" }}
                 >
                   <button
                     onClick={() => handleExport("json")}
