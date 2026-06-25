@@ -29,7 +29,12 @@ export default function HostedZonesPage() {
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  // Seed from the ?q= param (e.g. when the top-nav search navigates here).
+  const [search, setSearch] = useState(() =>
+    typeof window !== "undefined"
+      ? (new URLSearchParams(window.location.search).get("q") ?? "")
+      : "",
+  );
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [selected, setSelected] = useState<Set<string>>(new Set());

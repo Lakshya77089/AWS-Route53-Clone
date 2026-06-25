@@ -78,15 +78,19 @@ export default function Sidebar() {
       }}
     >
       {/* Service switcher header */}
-      <button
-        className="flex items-center justify-between px-4 py-3 border-b text-left hover:bg-gray-50 transition-colors"
-        style={{ borderColor: "var(--aws-sidebar-border)" }}
+      <Link
+        href="/"
+        className="flex items-center justify-between px-4 py-3 border-b text-left transition-colors"
+        style={{
+          borderColor: "var(--aws-sidebar-border)",
+          backgroundColor: "var(--aws-sidebar)",
+        }}
       >
         <span className="text-sm font-bold" style={{ color: "var(--aws-text)" }}>
           Route 53
         </span>
         <ChevronDown className="w-4 h-4" style={{ color: "var(--aws-text-secondary)" }} />
-      </button>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2">

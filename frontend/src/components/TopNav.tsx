@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Search, Bell, HelpCircle, Settings, ChevronDown, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -12,6 +13,7 @@ export default function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [accountOpen, setAccountOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   if (!user || pathname === "/login") return null;
 
@@ -29,35 +31,33 @@ export default function TopNav() {
       }}
     >
       {/* Logo + service name */}
-      <div className="flex items-center gap-2 px-2 h-full">
-        <svg viewBox="0 0 24 24" className="w-6 h-6" aria-hidden>
-          <path
-            d="M5 13.5c1 2 3.5 3 6.8 3 4.6 0 8.2-1.7 8.2-1.7"
-            fill="none"
-            stroke="#ff9900"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-          <path d="M19 14.3l1.6.9-.9 1.6" fill="none" stroke="#ff9900" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          <text x="2" y="10" fill="#ffffff" fontSize="11" fontWeight="700">
-            aws
-          </text>
-        </svg>
+      <Link href="/" className="flex items-center gap-2 px-2 h-full">
+        <span className="text-[#ff9900] font-bold text-base leading-none tracking-tight">
+          aws
+        </span>
         <div className="w-px h-5 bg-white/20 mx-1" />
         <span className="text-white text-sm font-medium">Route 53</span>
-      </div>
+      </Link>
 
       {/* Search */}
       <div className="flex-1 flex justify-center px-4">
-        <div className="relative w-full max-w-md">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = search.trim();
+            router.push(q ? `/hosted-zones?q=${encodeURIComponent(q)}` : "/hosted-zones");
+          }}
+          className="relative w-full max-w-md"
+        >
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/50" />
           <input
             type="text"
-            placeholder="Search"
-            readOnly
-            className="w-full pl-8 pr-3 py-1 text-xs rounded bg-white/10 text-white placeholder-white/50 border border-white/10 focus:outline-none focus:border-white/30 cursor-default"
+            placeholder="Search hosted zones"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-1 text-xs rounded bg-white/10 text-white placeholder-white/50 border border-white/10 focus:outline-none focus:border-white/30"
           />
-        </div>
+        </form>
       </div>
 
       {/* Right cluster */}
