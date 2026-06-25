@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
+import { useShortcuts } from "@/lib/use-shortcuts";
 import api, { authHeaders } from "@/lib/api";
 import type { HostedZone } from "@/types";
 import {
@@ -37,6 +38,12 @@ export default function HostedZonesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const actionsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useShortcuts([
+    { key: "/", handler: () => searchRef.current?.focus() },
+    { key: "c", handler: () => router.push("/hosted-zones/create") },
+  ]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -213,8 +220,9 @@ export default function HostedZonesPage() {
           style={{ color: "var(--aws-text-secondary)" }}
         />
         <input
+          ref={searchRef}
           type="text"
-          placeholder="Find hosted zones"
+          placeholder="Find hosted zones  (press / to focus)"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);

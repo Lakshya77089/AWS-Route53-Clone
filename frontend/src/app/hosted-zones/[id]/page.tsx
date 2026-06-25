@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
+import { useShortcuts } from "@/lib/use-shortcuts";
 import api, { authHeaders } from "@/lib/api";
 import type { HostedZone, DNSRecord } from "@/types";
 import { RECORD_TYPES } from "@/types";
@@ -60,6 +61,12 @@ export default function ZoneDetailPage() {
   const [showDelete, setShowDelete] = useState<DNSRecord[] | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useShortcuts([
+    { key: "/", handler: () => searchRef.current?.focus() },
+    { key: "c", handler: () => router.push(`/hosted-zones/${zoneId}/records/create`) },
+  ]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -420,8 +427,9 @@ export default function ZoneDetailPage() {
             style={{ color: "var(--aws-text-secondary)" }}
           />
           <input
+            ref={searchRef}
             type="text"
-            placeholder="Search records by name or value..."
+            placeholder="Search records by name or value  (press / to focus)"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
