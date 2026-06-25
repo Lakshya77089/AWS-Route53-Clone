@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import api, { authHeaders } from "@/lib/api";
@@ -10,20 +11,13 @@ import {
   Plus,
   Search,
   Globe,
-  Edit3,
-  Trash2,
   ChevronRight,
+  ChevronDown,
   RotateCw,
   Lock,
   Unlock,
 } from "lucide-react";
 import Modal from "@/components/Modal";
-
-interface ZoneFormState {
-  name: string;
-  description: string;
-  private_zone: boolean;
-}
 
 export default function HostedZonesPage() {
   const { user, loading: authLoading } = useAuth();
@@ -35,16 +29,14 @@ export default function HostedZonesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [showCreate, setShowCreate] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [showEdit, setShowEdit] = useState<HostedZone | null>(null);
-  const [showDelete, setShowDelete] = useState<HostedZone | null>(null);
-  const [form, setForm] = useState<ZoneFormState>({
-    name: "",
-    description: "",
-    private_zone: false,
-  });
+  const [showDelete, setShowDelete] = useState<HostedZone[] | null>(null);
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -71,38 +63,19 @@ export default function HostedZonesPage() {
     if (user) fetchZones();
   }, [user, fetchZones]);
 
-  const handleCreate = async () => {
-    if (!form.name) return;
-    setSaving(true);
-    setError("");
-    try {
-      await api.post("/hosted-zones", form, { headers: authHeaders() });
-      setShowCreate(false);
-      setForm({ name: "", description: "", private_zone: false });
-      await fetchZones();
-      toast.success(`Hosted zone "${form.name}" created`);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      const message = e.response?.data?.detail || "Failed to create hosted zone";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleEdit = async () => {
-    if (!showEdit || !form.name) return;
+    if (!showEdit) return;
     setSaving(true);
     setError("");
     try {
-      await api.put(`/hosted-zones/${showEdit.id}`, form, {
-        headers: authHeaders(),
-      });
+      await api.put(
+        `/hosted-zones/${showEdit.id}`,
+        { description },
+        { headers: authHeaders() },
+      );
       setShowEdit(null);
-      setForm({ name: "", description: "", private_zone: false });
       await fetchZones();
-      toast.success(`Hosted zone "${form.name}" updated`);
+      toast.success(`Hosted zone "${showEdit.name}" updated`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       const message = e.response?.data?.detail || "Failed to update hosted zone";
@@ -115,36 +88,52 @@ export default function HostedZonesPage() {
 
   const handleDelete = async () => {
     if (!showDelete) return;
-    const name = showDelete.name;
+    const targets = showDelete;
     try {
-      await api.delete(`/hosted-zones/${showDelete.id}`, {
-        headers: authHeaders(),
-      });
+      await Promise.all(
+        targets.map((z) =>
+          api.delete(`/hosted-zones/${z.id}`, { headers: authHeaders() }),
+        ),
+      );
       setShowDelete(null);
+      setSelected(new Set());
       await fetchZones();
-      toast.success(`Hosted zone "${name}" deleted`);
+      toast.success(
+        targets.length === 1
+          ? `Hosted zone "${targets[0].name}" deleted`
+          : `${targets.length} hosted zones deleted`,
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       toast.error(e.response?.data?.detail || "Failed to delete hosted zone");
     }
   };
 
-  const openCreate = () => {
-    setForm({ name: "", description: "", private_zone: false });
-    setError("");
-    setShowCreate(true);
-  };
-
   const openEdit = (z: HostedZone) => {
-    setForm({
-      name: z.name,
-      description: z.description ?? "",
-      private_zone: z.private_zone,
-    });
+    setDescription(z.description ?? "");
     setError("");
     setShowEdit(z);
+    setActionsOpen(false);
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === zones.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(zones.map((z) => z.id)));
+    }
+  };
+
+  const selectedZones = zones.filter((z) => selected.has(z.id));
   const totalPages = Math.ceil(total / pageSize);
 
   if (authLoading || !user) return null;
@@ -153,52 +142,79 @@ export default function HostedZonesPage() {
     <div className="p-6">
       {/* Breadcrumb */}
       <div
-        className="flex items-center gap-1 text-xs mb-4"
+        className="aws-breadcrumb flex items-center gap-1 text-xs mb-3"
         style={{ color: "var(--aws-text-secondary)" }}
       >
-        <span>Route 53</span>
+        <Link href="/">Route 53</Link>
         <ChevronRight className="w-3 h-3" />
-        <span className="font-medium" style={{ color: "var(--aws-text)" }}>
-          Hosted Zones
-        </span>
+        <span style={{ color: "var(--aws-text)" }}>Hosted zones</span>
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold">Hosted Zones</h1>
-          <p
-            className="text-xs mt-0.5"
-            style={{ color: "var(--aws-text-secondary)" }}
+        <h1 className="text-2xl font-normal" style={{ color: "var(--aws-text)" }}>
+          Hosted zones{" "}
+          <span className="text-base" style={{ color: "var(--aws-text-secondary)" }}>
+            ({total})
+          </span>
+        </h1>
+        <div className="flex items-center gap-2">
+          <div className="relative" ref={actionsRef}>
+            <button
+              onClick={() => setActionsOpen((v) => !v)}
+              className="btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
+            >
+              Actions
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            {actionsOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 w-44 rounded shadow-lg border z-20 py-1"
+                  style={{ backgroundColor: "#fff", borderColor: "var(--aws-border)" }}
+                >
+                  <button
+                    disabled={selectedZones.length !== 1}
+                    onClick={() => selectedZones.length === 1 && openEdit(selectedZones[0])}
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    disabled={selectedZones.length === 0}
+                    onClick={() => {
+                      setShowDelete(selectedZones);
+                      setActionsOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ color: "var(--aws-red)" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            onClick={() => router.push("/hosted-zones/create")}
+            className="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
           >
-            {total} hosted zone{total !== 1 ? "s" : ""}
-          </p>
+            <Plus className="w-4 h-4" />
+            Create hosted zone
+          </button>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white rounded transition-colors"
-          style={{ backgroundColor: "var(--aws-blue)" }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "var(--aws-blue-hover)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = "var(--aws-blue)")
-          }
-        >
-          <Plus className="w-4 h-4" />
-          Create Hosted Zone
-        </button>
       </div>
 
       {/* Search */}
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <Search
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
           style={{ color: "var(--aws-text-secondary)" }}
         />
         <input
           type="text"
-          placeholder="Search hosted zones..."
+          placeholder="Find hosted zones"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -217,12 +233,12 @@ export default function HostedZonesPage() {
         <div className="flex items-center justify-center py-12">
           <RotateCw
             className="w-5 h-5 animate-spin"
-            style={{ color: "var(--aws-primary)" }}
+            style={{ color: "var(--aws-blue)" }}
           />
         </div>
       ) : zones.length === 0 ? (
         <div
-          className="rounded-lg border p-8 text-center"
+          className="rounded border p-8 text-center"
           style={{
             backgroundColor: "var(--aws-card)",
             borderColor: "var(--aws-border)",
@@ -244,7 +260,7 @@ export default function HostedZonesPage() {
         </div>
       ) : (
         <div
-          className="rounded-lg border overflow-hidden"
+          className="rounded border overflow-hidden"
           style={{
             backgroundColor: "var(--aws-card)",
             borderColor: "var(--aws-border)",
@@ -252,21 +268,26 @@ export default function HostedZonesPage() {
         >
           <table className="aws-table w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: "var(--aws-bg)" }}>
-                <th className="text-left px-4 py-2.5 font-semibold text-xs uppercase tracking-wider">
-                  Domain Name
+              <tr>
+                <th className="w-10 px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={zones.length > 0 && selected.size === zones.length}
+                    onChange={toggleSelectAll}
+                    className="accent-[var(--aws-blue)]"
+                  />
                 </th>
-                <th className="text-left px-4 py-2.5 font-semibold text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-2.5 font-semibold text-xs">
+                  Domain name
+                </th>
+                <th className="text-left px-4 py-2.5 font-semibold text-xs">
                   Type
                 </th>
-                <th className="text-left px-4 py-2.5 font-semibold text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-2.5 font-semibold text-xs">
                   Description
                 </th>
-                <th className="text-center px-4 py-2.5 font-semibold text-xs uppercase tracking-wider">
-                  Records
-                </th>
-                <th className="text-right px-4 py-2.5 font-semibold text-xs uppercase tracking-wider">
-                  Actions
+                <th className="text-center px-4 py-2.5 font-semibold text-xs">
+                  Record count
                 </th>
               </tr>
             </thead>
@@ -274,10 +295,21 @@ export default function HostedZonesPage() {
               {zones.map((zone) => (
                 <tr
                   key={zone.id}
-                  className="border-t cursor-pointer hover:bg-blue-50/30 transition-colors"
-                  style={{ borderTopColor: "var(--aws-border)" }}
+                  className="border-t cursor-pointer transition-colors"
+                  style={{
+                    borderTopColor: "var(--aws-border-divider)",
+                    backgroundColor: selected.has(zone.id) ? "var(--aws-blue-bg)" : undefined,
+                  }}
                   onClick={() => router.push(`/hosted-zones/${zone.id}`)}
                 >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(zone.id)}
+                      onChange={() => toggleSelect(zone.id)}
+                      className="accent-[var(--aws-blue)]"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Globe
@@ -285,7 +317,7 @@ export default function HostedZonesPage() {
                         style={{ color: "var(--aws-blue)" }}
                       />
                       <span
-                        className="font-medium"
+                        className="font-medium hover:underline"
                         style={{ color: "var(--aws-blue)" }}
                       >
                         {zone.name}
@@ -297,12 +329,10 @@ export default function HostedZonesPage() {
                       className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded"
                       style={{
                         backgroundColor: zone.private_zone
-                          ? "#fef3c7"
-                          : "#eff6ff",
-                        color: zone.private_zone
-                          ? "#92400e"
-                          : "var(--aws-blue)",
-                        border: `1px solid ${zone.private_zone ? "#fde68a" : "#bfdbfe"}`,
+                          ? "var(--aws-orange-bg)"
+                          : "var(--aws-blue-bg)",
+                        color: zone.private_zone ? "#8a6116" : "var(--aws-blue)",
+                        border: `1px solid ${zone.private_zone ? "#f2dba0" : "#bde0fe"}`,
                       }}
                     >
                       {zone.private_zone ? (
@@ -320,34 +350,6 @@ export default function HostedZonesPage() {
                     {zone.description || "-"}
                   </td>
                   <td className="px-4 py-3 text-center">{zone.record_count}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEdit(zone);
-                      }}
-                      className="p-1 rounded hover:bg-gray-100 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit3
-                        className="w-4 h-4"
-                        style={{ color: "var(--aws-text-secondary)" }}
-                      />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowDelete(zone);
-                      }}
-                      className="p-1 rounded hover:bg-red-50 transition-colors ml-1"
-                      title="Delete"
-                    >
-                      <Trash2
-                        className="w-4 h-4"
-                        style={{ color: "var(--aws-red)" }}
-                      />
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -358,13 +360,12 @@ export default function HostedZonesPage() {
             <div
               className="flex items-center justify-between px-4 py-2 border-t text-xs"
               style={{
-                borderTopColor: "var(--aws-border)",
-                backgroundColor: "var(--aws-bg)",
+                borderTopColor: "var(--aws-border-divider)",
+                backgroundColor: "var(--aws-table-header)",
               }}
             >
               <span style={{ color: "var(--aws-text-secondary)" }}>
-                Showing {(page - 1) * pageSize + 1}–
-                {Math.min(page * pageSize, total)} of {total}
+                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
               </span>
               <div className="flex gap-2">
                 <button
@@ -389,44 +390,34 @@ export default function HostedZonesPage() {
         </div>
       )}
 
-      {/* Create Modal */}
-      <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Create Hosted Zone"
-      >
-        <ZoneForm form={form} onChange={setForm} />
-        {error && (
-          <p className="text-xs mt-2" style={{ color: "var(--aws-red)" }}>
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-2 mt-4">
-          <button
-            onClick={() => setShowCreate(false)}
-            className="px-3 py-1.5 text-sm border rounded"
-            style={{ borderColor: "var(--aws-border)" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={saving || !form.name}
-            className="px-3 py-1.5 text-sm font-semibold text-white rounded disabled:opacity-50"
-            style={{ backgroundColor: "var(--aws-blue)" }}
-          >
-            {saving ? "Creating..." : "Create"}
-          </button>
-        </div>
-      </Modal>
-
-      {/* Edit Modal */}
+      {/* Edit Modal — only the description is editable, matching real Route 53 behavior */}
       <Modal
         open={!!showEdit}
         onClose={() => setShowEdit(null)}
-        title="Edit Hosted Zone"
+        title="Edit hosted zone"
       >
-        <ZoneForm form={form} onChange={setForm} />
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1">Domain name</label>
+            <div
+              className="w-full px-3 py-1.5 text-sm border rounded font-mono"
+              style={{ borderColor: "var(--aws-border)", backgroundColor: "var(--aws-bg)" }}
+            >
+              {showEdit?.name}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional description"
+              className="w-full px-3 py-1.5 text-sm border rounded"
+              style={{ borderColor: "var(--aws-border)" }}
+            />
+          </div>
+        </div>
         {error && (
           <p className="text-xs mt-2" style={{ color: "var(--aws-red)" }}>
             {error}
@@ -435,16 +426,14 @@ export default function HostedZonesPage() {
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={() => setShowEdit(null)}
-            className="px-3 py-1.5 text-sm border rounded"
-            style={{ borderColor: "var(--aws-border)" }}
+            className="btn-secondary px-3 py-1.5 text-sm rounded"
           >
             Cancel
           </button>
           <button
             onClick={handleEdit}
-            disabled={saving || !form.name}
-            className="px-3 py-1.5 text-sm font-semibold text-white rounded disabled:opacity-50"
-            style={{ backgroundColor: "var(--aws-blue)" }}
+            disabled={saving}
+            className="btn-primary px-3 py-1.5 text-sm font-medium rounded disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save"}
           </button>
@@ -455,11 +444,20 @@ export default function HostedZonesPage() {
       <Modal
         open={!!showDelete}
         onClose={() => setShowDelete(null)}
-        title="Delete Hosted Zone?"
+        title={showDelete && showDelete.length === 1 ? "Delete hosted zone?" : "Delete hosted zones?"}
       >
         <p className="text-sm">
-          Are you sure you want to delete <strong>{showDelete?.name}</strong>?
-          This will also delete all DNS records in this zone.
+          {showDelete && showDelete.length === 1 ? (
+            <>
+              Are you sure you want to delete <strong>{showDelete[0].name}</strong>?
+              This will also delete all DNS records in this zone.
+            </>
+          ) : (
+            <>
+              Are you sure you want to delete <strong>{showDelete?.length}</strong>{" "}
+              hosted zones? This will also delete all DNS records in these zones.
+            </>
+          )}
         </p>
         <p className="text-xs mt-2" style={{ color: "var(--aws-red)" }}>
           This action cannot be undone.
@@ -467,92 +465,19 @@ export default function HostedZonesPage() {
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={() => setShowDelete(null)}
-            className="px-3 py-1.5 text-sm border rounded"
-            style={{ borderColor: "var(--aws-border)" }}
+            className="btn-secondary px-3 py-1.5 text-sm rounded"
           >
             Cancel
           </button>
           <button
             onClick={handleDelete}
-            className="px-3 py-1.5 text-sm font-semibold text-white rounded"
+            className="px-3 py-1.5 text-sm font-medium text-white rounded"
             style={{ backgroundColor: "var(--aws-red)" }}
           >
             Delete
           </button>
         </div>
       </Modal>
-    </div>
-  );
-}
-
-function ZoneForm({
-  form,
-  onChange,
-}: {
-  form: ZoneFormState;
-  onChange: (f: ZoneFormState) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <div>
-        <label className="block text-xs font-semibold mb-1">
-          Domain Name <span style={{ color: "var(--aws-red)" }}>*</span>
-        </label>
-        <input
-          type="text"
-          value={form.name}
-          onChange={(e) => onChange({ ...form, name: e.target.value })}
-          placeholder="example.com"
-          className="w-full px-3 py-1.5 text-sm border rounded"
-          style={{ borderColor: "var(--aws-border)" }}
-        />
-        <p
-          className="text-[10px] mt-1"
-          style={{ color: "var(--aws-text-secondary)" }}
-        >
-          Enter a domain name with a trailing dot (e.g., example.com.)
-        </p>
-      </div>
-      <div>
-        <label className="block text-xs font-semibold mb-1">Description</label>
-        <input
-          type="text"
-          value={form.description}
-          onChange={(e) => onChange({ ...form, description: e.target.value })}
-          placeholder="Optional description"
-          className="w-full px-3 py-1.5 text-sm border rounded"
-          style={{ borderColor: "var(--aws-border)" }}
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold mb-2">Type</label>
-        <div className="flex gap-4">
-          {[false, true].map((isPrivate) => (
-            <label
-              key={String(isPrivate)}
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <input
-                type="radio"
-                checked={form.private_zone === isPrivate}
-                onChange={() => onChange({ ...form, private_zone: isPrivate })}
-                className="accent-[var(--aws-blue)]"
-              />
-              <span className="text-sm">
-                {isPrivate ? "Private" : "Public"}
-              </span>
-            </label>
-          ))}
-        </div>
-        <p
-          className="text-[10px] mt-1"
-          style={{ color: "var(--aws-text-secondary)" }}
-        >
-          {form.private_zone
-            ? "Private zones are accessible only from within your VPCs"
-            : "Public zones route traffic on the internet"}
-        </p>
-      </div>
     </div>
   );
 }

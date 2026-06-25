@@ -56,15 +56,19 @@ export default function Dashboard() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold" style={{ color: "var(--aws-text)" }}>
-          Dashboard
+      <div
+        className="mb-6 pb-4 border-b"
+        style={{ borderColor: "var(--aws-border-divider)" }}
+      >
+        <h1 className="text-2xl font-normal" style={{ color: "var(--aws-text)" }}>
+          Route 53 Dashboard
         </h1>
         <p
           className="text-sm mt-1"
           style={{ color: "var(--aws-text-secondary)" }}
         >
-          Welcome to Route 53 Console, {user.username}
+          Welcome back, {user.username}. Route 53 is a highly available and
+          scalable DNS web service.
         </p>
       </div>
 
@@ -74,7 +78,7 @@ export default function Dashboard() {
           const Icon = s.icon;
           const card = (
             <div
-              className="rounded-lg border p-5 h-full transition-shadow hover:shadow-md"
+              className="rounded border p-5 h-full transition-shadow hover:shadow-sm"
               style={{
                 backgroundColor: "var(--aws-card)",
                 borderColor: "var(--aws-border)",
@@ -82,8 +86,8 @@ export default function Dashboard() {
             >
               <div className="flex items-start gap-3">
                 <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: "var(--aws-bg)" }}
+                  className="w-9 h-9 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: "var(--aws-blue-bg)" }}
                 >
                   <Icon
                     className="w-5 h-5"
@@ -92,12 +96,17 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm">{s.name}</h3>
+                    <h3
+                      className="font-medium text-sm"
+                      style={{ color: "var(--aws-blue)" }}
+                    >
+                      {s.name}
+                    </h3>
                     {s.coming && (
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded font-medium"
                         style={{
-                          backgroundColor: "#fafafa",
+                          backgroundColor: "var(--aws-bg)",
                           color: "var(--aws-text-secondary)",
                         }}
                       >

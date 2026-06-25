@@ -50,14 +50,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ success, error }}>
       {children}
-      <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-80">
+      <div className="fixed top-10 left-0 right-0 z-[100] flex flex-col items-center gap-1.5 pt-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="flex items-start gap-2 px-3 py-2.5 rounded shadow-lg border text-sm bg-white animate-in"
+            className="pointer-events-auto flex items-start gap-2 px-4 py-2.5 rounded shadow-md border-l-4 border text-sm bg-white w-full max-w-2xl mx-4"
             style={{
-              borderColor:
+              borderLeftColor:
                 t.variant === "success" ? "var(--aws-green)" : "var(--aws-red)",
+              borderColor: "var(--aws-border-divider)",
+              backgroundColor:
+                t.variant === "success" ? "var(--aws-green-bg)" : "var(--aws-red-bg)",
             }}
           >
             {t.variant === "success" ? (
@@ -71,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 style={{ color: "var(--aws-red)" }}
               />
             )}
-            <span className="flex-1" style={{ color: "var(--aws-text)" }}>
+            <span className="flex-1 font-medium" style={{ color: "var(--aws-text)" }}>
               {t.message}
             </span>
             <button
